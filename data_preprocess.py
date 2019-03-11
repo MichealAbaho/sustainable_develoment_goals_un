@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import fetch_data as fd
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from collections import Counter
+import json
 
 
 class data_preprocessing:
