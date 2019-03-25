@@ -6,6 +6,8 @@ from sklearn.metrics import mean_squared_error
 from collections import Counter
 import string
 from datetime import datetime
+import pandas as pd
+import pprint
 
 import numpy as np
 import json
@@ -77,6 +79,27 @@ def convert_strings_to_floats(x):
         return float(x)
     else:
         return x
+
+def query_for_series_code(org_file, json_file):
+    new_data = []
+    with open(json_file, 'r') as rb:
+        org = pd.read_csv(org_file)
+        org_of_interest = org[['SeriesCode', 'SeriesDescription']]
+        load_file = json.load(rb)
+        for i in load_file:
+            for x,y in zip(org_of_interest['SeriesCode'], org_of_interest['SeriesDescription']):
+                if str(i['Series_description']).__contains__(str(y)):
+                    s = i['Series_description'].split('_')
+                    s = sorted(s, key=lambda x: len(x), reverse=True)
+                    e = '_'.join(i for i in s).rstrip('_')
+                    i['Series_description'] = e.replace(str(y), x)
+            new_data.append(i)
+
+    with open('encoded_TS_fb.json', 'w') as fb:
+        json.dump(new_data, fb, indent=2, sort_keys=True)
+    fb.close()
+
+query_for_series_code('egypt.csv', 'sdgs_time_series_fb.json')
 
 
 def modelling(x, y):
