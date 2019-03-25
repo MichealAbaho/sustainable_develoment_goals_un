@@ -9,84 +9,218 @@ import data_preprocess as dp
 from tabulate import tabulate
 import helper_functions as hf
 from statsmodels.tsa.arima_model import AR, ARIMA, ARMA
+from statsmodels.tsa.stattools import adfuller
 import matplotlib.pyplot as plt
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from fbprophet import Prophet
+import json
+import warnings
+import sys
+
+warnings.filterwarnings("ignore", category=Warning)
 
 class ts_forecast:
     def __init__(self, ts_dict):
         self.ts_dict = ts_dict
 
     def tS_forecast(self):
-        with open('sdgs_time_series.txt', 'w') as sdgs:
-            for i in self.ts_dict:
-                for df in (self.ts_dict[i]):
+        n = 4
+        t = []
+        json_dict = {}
+        with open('sdgs_time_series_arma.json', 'w') as sdgs:
+            with open('./PLOTS/combinations.txt', 'a') as comb_file:
+                for sd in self.ts_dict:
+                    df = self.ts_dict[sd]
                     if len(df) == 18:
                         v = df[df['Value'] == 0]
                         if (len(v) < 3):
-                            #print(tabulate(df, headers='keys', tablefmt='psql'))
-                            n = 4
-                            # years_to_predict = range(2018, 2021, 1)
+                            years_to_predict = range(2014, 2022, 1)
 
                             df['Year'] = df['Year'].astype(str).apply(lambda x: hf.obtain_date(x))
                             df.set_index('Year', inplace=True)
-                            plt.plot(df)
 
-                            rol_mean = pd.rolling_mean(df, window=10)
-                            rol_std = pd.rolling_std(df, window=10)
+                            # UNDO ONLY WHEN USING FACEBOOKPROPHET
+                            #df.columns = ['ds','y']
 
-                            # Plot rolling statistics:
-                            orig = plt.plot(df, color='blue', label='Original')
-                            mean = plt.plot(rol_mean, color='red', label='Rolling Mean')
-                            std = plt.plot(rol_std, color='black', label='Rolling Std')
-                            plt.legend(loc='best')
-                            plt.title('Rolling Mean & Standard Deviation')
-                            plt.show(block=False)
+                            #sd_p_value = exmine_the_stationarity(df, sd, comb_file, send_p_values=False)
 
-                            # Perform Dickey-Fuller test:
-                            # print
-                            # 'Results of Dickey-Fuller Test:'
-                            # dftest = adfuller(timeseries, autolag='AIC')
-                            # dfoutput = pd.Series(dftest[0:4], index=['Test Statistic', 'p-value', '#Lags Used',
-                            #                                          'Number of Observations Used'])
-                            # for key, value in dftest[4].items():
-                            #     dfoutput['Critical Value (%s)' % key] = value
-                            # print
-                            # dfoutput
+                            # UNDO ONLY WHEN TESTING THE NULL HYPOTHESIS OF THE STATIONARITY
+                            # if sd_p_value > 0.05:
+                            #     find_d(sd, df)
+                            #     validity_of_determined_p_d_q(sd, df)
 
-                            # d = df.values
-                            #
-                            # train, validate = d[:(len(df) - n)], d[(len(df) - n):]
-                            # # uv_data = list(autoArDfr['Value'])
-                            #
-                            # validate_bench = []
-                            # for i in validate:
-                            #     for j in i:
-                            #         validate_bench.append(j)
+                            train, validate = df[:(len(df) - n)], df[(len(df) - n):]
+                            actual = validate.Value.tolist()
+                            #FORECAST
+                            try:
+                                #ARIMA
+                                # arima = ARIMA(train, order=(0, 1, 1))
+                                # model_arima = arima.fit(disp=0)
+                                # fc, se, conf = model_arima.forecast(8, alpha=0.05)  # 95% conf
+                                # #Make as pandas series
+                                # fc_series = pd.Series(fc, index=years_to_predict)
+                                # lower_series = pd.Series(conf[:, 0], index=years_to_predict)
+                                # upper_series = pd.Series(conf[:, 1], index=years_to_predict)
+                                # predictions = fc.tolist()[:4]
+                                # json_dict['Series_description'] = sd
+                                # json_dict['Predicted_period'] = list(years_to_predict)
+                                # json_dict['Arima'] = fc.tolist()
+                                # json_dict['RMSE'] = prediction_accuracies(predictions, actual)
+                                #
+                                #
+                                # #UNDO TO VISUALIZE HOW PREDICTIONS ARE TRENDING vs EXPECTATIONS
+                                # # plt.figure(figsize=(12, 5), dpi=100)
+                                # # plt.plot(train, label='training')
+                                # # plt.plot(validate, label='actual')
+                                # # plt.plot(fc_series, label='forecast')
+                                # # plt.fill_between(lower_series.index, lower_series, upper_series,
+                                # #                  color='k', alpha=.15)
+                                # # plt.title('Forecast vs Actuals')
+                                # # plt.legend(loc='upper left', fontsize=8)
+                                # # plt.show()
+                                #
+                                # #BASELINE AUTO-ARIMA
+                                # model_autoarima = auto_arima(train,
+                                #                              trace=True,
+                                #                              test='adf',
+                                #                              max_p=3, max_q=3,
+                                #                              m=1,
+                                #                              d = None,
+                                #                              seasonal=False,
+                                #                              error_action='ignore',
+                                #                              suppress_warnings=True,
+                                #                              stepwise=True)
+                                # a_arima = model_autoarima.fit(train)
+                                # arima_forecast = a_arima.predict(n_periods=len(years_to_predict))  # forecasting the next 4 years
+                                # predictions = arima_forecast.tolist()[:4]
+                                # json_dict['Series_description'] = sd
+                                # json_dict['Predicted_period'] = list(years_to_predict)
+                                # json_dict['Auto_ARIMA'] = arima_forecast.tolist()
+                                # json_dict['RMSE'] = prediction_accuracies(predictions, actual)
+                                #
+                                #
+                                # #FACEBOOK PROHPET
+                                # fb = Prophet(weekly_seasonality=True)
+                                # fb_model = fb.fit(train)
+                                # future = fb_model.make_future_dataframe(periods=len(years_to_predict))
+                                # fb_predict = fb.predict(future)
+                                # predictions = list(fb_predict['yhat'])[-8:][:4]
+                                # actual = validate.y.tolist()
+                                # json_dict['Series_description'] = sd
+                                # json_dict['Predicted_period'] = list(years_to_predict)
+                                # json_dict['FB_prophet'] = list(fb_predict['yhat'])[-8:]
+                                # json_dict['RMSE'] = prediction_accuracies(predictions, actual)
 
-                            # #baseline set of models for time series forecasting
-                            #models = {'AR': AR(train), 'ARMA': ARMA(train, order=(0, 1))}
-                            # for i in (models):
-                            #     mod = models[i].fit()
-                            #     print('MODEL : {}'.format((i)))
-                            #     print('Coefficients: %s' % mod.params)
-                                #predictions = mod.predict(start=len(train), end=len(train) + len(validate)-1, dynamic=False)
-                                # for j in range(len(predictions)):
-                                #     print('Predicted - {:.4f} yet Actual Value is {:.4f}'.format(predictions[j], validate_bench[j]))
-                                # print('RMSE is {}\n'.format(math.sqrt(mean_squared_error(validate_bench, predictions))))
+                                #BASELINE ARMA
+                                arma = ARMA(train, order=(0,1))
+                                arma_model = arma.fit(disp=0)
+                                #print('Coefficients: %s' % arma_model.params)
+                                arma_predict = arma_model.predict(start=len(train), end=len(train) + 7, dynamic=False)
+                                predictions = arma_predict.tolist()
+                                json_dict['Series_description'] = sd
+                                json_dict['Predicted_period'] = list(years_to_predict)
+                                json_dict['ARMA'] = predictions
+                                r_mse, mape = prediction_accuracies(predictions[:4], actual)
+                                json_dict['RMSE'] = r_mse
+                                json_dict['MAPE (%)'] = mape
+                                t.append(json_dict)
+                                json_dict = {}
 
-                            ##baseline auto-arima
-                            # model = auto_arima(train, trace=True, error_action='ignore', suppress_warnings=True, stepwise=True)
-                            # a_arima = model.fit(train)
-                            # arima_predict = a_arima.predict(n_periods=len(validate))
-                            # forecast = a_arima.predict(n_periods=len(validate) + 15)  # forecasting the next 5 years
-                            #
-                            # print('\nMODEL: ARIMA')
-                            # for j in range(len(arima_predict)):
-                            #     print('Predicted - {:.4f} yet Actual Value is {:.4f}'.format(arima_predict[j], validate_bench[j]))
-                            # auto_arima_df = pd.DataFrame(forecast, columns=['Prediction'])
-                            # print('RMSE is {}'.format(math.sqrt(mean_squared_error(validate_bench, arima_predict))))
-                            # print('MAE is ', mean_absolute_error(validate_bench, arima_predict))
-                            # for x, y in zip(years_to_predict, forecast[-13:]):
-                            #     print('Prediction for {} is {}'.format(x, y))
+                            except Exception as e:
+                                exc_type, exc_obj, exc_tb = sys.exc_info()
+                                print(exc_type)
+                                print(exc_obj)
+                                print(exc_tb.tb_lineno)
+
+                json.dump(t, sdgs, indent=2, sort_keys=True)
+                sdgs.close()
+
+
+
+#take a close look at rolling stats
+def examine_rolling_metrics(df):
+    rol_mean = df.rolling(2).mean()
+    rol_std = df.rolling(2).std()
+
+    # Plot rolling statistics:
+    orig = plt.plot(df, color='blue', label='Original')
+    mean = plt.plot(rol_mean, color='red', label='Rolling Mean')
+    std = plt.plot(rol_std, color='black', label='Rolling Std')
+    plt.legend(loc='best')
+    plt.title('Rolling Mean & Standard Deviation')
+    plt.show()
+
+#examine the stationarity of the time series
+def exmine_the_stationarity(df, sd, file, send_p_values=False):
+    result = adfuller(df.Value.dropna())
+    if send_p_values == True:
+        comb_file = open(file, 'a')
+        try:
+            comb_file.write('\n{}'.format(sd))
+            comb_file.write('\nADF Statistic: {:.4f}'.format(result[0]))
+            comb_file.write('\np-value: {:.4f}'.format(result[1]))
+            print('ADF Statistic: %f' % result[0])
+            print('p-value: %f' % result[1])
+
+        except Exception as e:
+            print(sd)
+            print(e)
+        comb_file.close()
+    return result[1]
+
+#p,d,q exmination
+def find_d(sd, df):
+    # Original Series
+    fig, axes = plt.subplots(3, 2, sharex=True)
+    axes[0, 0].plot(df.Value);
+    axes[0, 0].set_title('Original')
+    plt.title('{}'.format(sd))
+    plot_acf(df.Value, ax=axes[0, 1])
+
+    # 1st Differencing
+    axes[1, 0].plot(df.Value.diff());
+    axes[1, 0].set_title('1st Order Differencing')
+    plot_acf(df.Value.diff().dropna(), ax=axes[1, 1])
+
+    # 2nd Differencing
+    axes[2, 0].plot(df.Value.diff().diff());
+    axes[2, 0].set_title('2nd Order Differencing')
+    plot_acf(df.Value.diff().diff().dropna(), ax=axes[2, 1])
+    plt.show()
+
+def find_p(sd, df):
+    # Original Series
+    fig, axes = plt.subplots(3, 2, sharex=True)
+    axes[0, 0].plot(df.Value);
+    axes[0, 0].set_title('Original')
+    plt.title('{}'.format(sd))
+    plot_pacf(df.Value, ax=axes[0, 1])
+
+    # 1st Differencing
+    axes[1, 0].plot(df.Value.diff());
+    axes[1, 0].set_title('1st Order Differencing')
+    plot_pacf(df.Value.diff().dropna(), ax=axes[1, 1])
+
+    plt.show()
+
+def validity_of_determined_p_d_q(sd, df):
+    try:
+        model = ARIMA(df, order=(0, 1, 1))
+        model_fit = model.fit(disp=0)
+        model_fit.plot_predict(dynamic=False)
+        plt.xticks(list(df.index))
+        plt.show()
+
+    except Exception as e:
+        print(sd)
+        print(e)
+
+def prediction_accuracies(prediction, actual):
+    difference = np.subtract(prediction, actual)
+    mean_abs_err = np.mean(np.abs(difference))
+    rmse = np.nanmean(difference**2)**.5
+    return rmse, np.mean(difference)
+
 
 if __name__=='__main__':
     data_processed = dp.data_preprocessing('egypt.csv')
@@ -107,3 +241,25 @@ if __name__=='__main__':
         #         v = j[j['Value'] == 0]
         #         if(len(v) < 3):
         #             print(tabulate(j, headers='keys', tablefmt='psql'))
+
+
+        #baseline set of models for time series forecasting
+                        # models = {'AR': AR(train), 'ARMA': ARMA(train, order=(0, 1))}
+                        # for i in (models):
+                        #     mod = models[i].fit()
+                        #     print('MODEL : {}'.format((i)))
+                        #     print('Coefficients: %s' % mod.params)
+                        #     predictions = mod.predict(start=len(train), end=len(train) + len(validate)-1, dynamic=False)
+                        #     for j in range(len(predictions)):
+                        #         print('Predicted - {:.4f} yet Actual Value is {:.4f}'.format(predictions[j], validate_bench[j]))
+                        #     print('RMSE is {}\n'.format(math.sqrt(mean_squared_error(validate_bench, predictions))))
+
+
+                        # print('\nMODEL: ARIMA')
+                        # for j in range(len(arima_predict)):
+                        #     print('Predicted - {:.4f} yet Actual Value is {:.4f}'.format(arima_predict[j], validate_bench[j]))
+                        # auto_arima_df = pd.DataFrame(forecast, columns=['Prediction'])
+                        # print('RMSE is {}'.format(math.sqrt(mean_squared_error(validate_bench, arima_predict))))
+                        # print('MAE is ', mean_absolute_error(validate_bench, arima_predict))
+                        # for x, y in zip(years_to_predict, forecast[-13:]):
+                        #     print('Prediction for {} is {}'.format(x, y))
