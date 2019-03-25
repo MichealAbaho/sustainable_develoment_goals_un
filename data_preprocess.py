@@ -5,6 +5,7 @@ import fetch_data as fd
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from collections import Counter
 import json
+from tabulate import tabulate
 
 
 class data_preprocessing:
@@ -36,7 +37,7 @@ class data_preprocessing:
         #  completely irrelvant infoirmation for analysis and 'TimePeriod' was replaced by Year
         #
         a_dataset = drop_cols(dataset, ['Time_Detail', 'Source', 'FootNote', 'Name of international agreement', 'Reporting Type', 'Nature','TimePeriod'])
-        print('Number of columns before {}'.format(len(a_dataset.columns)))
+        print('Number of columns After {}'.format(len(a_dataset.columns)))
         #deleting last raw in the datase t becouse its empty
         a_dataset=a_dataset[:-1]
 
@@ -125,5 +126,6 @@ def label_decode(elem):
 def one_encod(elem):
     o_encod = OneHotEncoder()
     return o_encod.fit_transform(elem)
+
 
 
