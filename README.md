@@ -10,5 +10,5 @@ Dataset
 
 Methods
 ---------------
-Auto Arima, FacebookProfit, ARMA and AR.
+Auto Arima, Facebook Prophet, ARMA and AR.
 Hierarchical Time Series Analysis. Predicting whether countries would achieve goals at a certain time t, by hierarchically examining a number of indicators benchmarked against predefined thresholds. 
