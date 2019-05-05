@@ -4,6 +4,7 @@ import os
 import re
 import json
 import math
+import pprint
 
 from tabulate import tabulate
 
@@ -62,35 +63,34 @@ def hierarchical_enforcement(tax_file, ts_json):
                     if sign == '<' and th.__contains__('%'):
                         expected_2030 = (value_2015 * (100 - threshold)) / 100
                         if (prediction <= expected_2030):
-                            e.append((goal, targ, ind, sd, s_c+s_c_meta_data, value_2015, prediction, 'T'))
+                            e.append((goal, targ, ind, sd, s_c, s_c_meta_data, value_2015, prediction, 'T'))
                         else:
-                            e.append((goal, targ, ind, sd, s_c+s_c_meta_data, value_2015, prediction, 'F'))
+                            e.append((goal, targ, ind, sd, s_c, s_c_meta_data, value_2015, prediction, 'F'))
                     elif sign == '>' and th.__contains__('%'):
                         expected_2030 = (value_2015 * (100 + threshold)) / 100
                         if (prediction >= expected_2030):
-                            e.append((goal, targ, ind, sd, s_c+s_c_meta_data, value_2015, prediction, 'T'))
+                            e.append((goal, targ, ind, sd, s_c, s_c_meta_data, value_2015, prediction, 'T'))
                         else:
-                            e.append((goal, targ, ind, sd, s_c+s_c_meta_data, value_2015, prediction, 'F'))
+                            e.append((goal, targ, ind, sd, s_c, s_c_meta_data, value_2015, prediction, 'F'))
                     elif sign == '<' and not th.__contains__('%'):
                         if (prediction <= value_2015):
-                            e.append((goal, targ, ind, sd, s_c+s_c_meta_data, value_2015, prediction, 'T'))
+                            e.append((goal, targ, ind, sd, s_c, s_c_meta_data, value_2015, prediction, 'T'))
                         else:
-                            e.append((goal, targ, ind, sd, s_c+s_c_meta_data, value_2015, prediction, 'F'))
+                            e.append((goal, targ, ind, sd, s_c, s_c_meta_data, value_2015, prediction, 'F'))
                     elif sign == '>' and not th.__contains__('%'):
                         if (prediction >= expected_2030):
-                            e.append((goal, targ, ind, sd, s_c+s_c_meta_data, value_2015, prediction, 'T'))
+                            e.append((goal, targ, ind, sd, s_c, s_c_meta_data, value_2015, prediction, 'T'))
                         else:
-                            e.append((goal, targ, ind, sd, s_c+s_c_meta_data, value_2015, prediction, 'F'))
+                            e.append((goal, targ, ind, sd, s_c, s_c_meta_data, value_2015, prediction, 'F'))
                 else:
-                    e.append((goal, targ, ind, sd, s_c+s_c_meta_data, value_2015, prediction, 'Currently Unknown Threshold'))
+                    e.append((goal, targ, ind, sd, s_c, s_c_meta_data, value_2015, prediction, 'Currently Unknown Threshold'))
             else:
                 pass
                 #print('This series code was not found {}'.format(series_code))
 
-    country_benchmark = pd.DataFrame(e, columns=['Goal', 'Target', 'Indicator', 'Series Description', 'Series Code', 'Initial Value', 'Prediction', 'Result'])
-    #country_benchmark_one_frame = country_benchmark_one_frame.drop_duplicates(keep='first', subset=['Series Code'])
-    country_benchmark_dend = country_benchmark[['Goal', 'Target', 'Indicator','Series Code','Result']]
-    #country_benchmark_dend.to_csv('egypt_bench_mark_one.csv')
+    country_benchmark = pd.DataFrame(e, columns=['Goal', 'Target', 'Indicator', 'Series Description', 'Series Code', 'Meta data', 'Initial Value', 'Prediction', 'Result'])
+    country_benchmark_dend = country_benchmark[['Goal', 'Target', 'Indicator','Series Code', 'Meta data', 'Result']]
+    country_benchmark_dend.to_csv('egypt_bench_mark_one.csv')
     # print(country_benchmark_one_frame.shape[0])
 
     return country_benchmark_dend
@@ -129,7 +129,35 @@ if __name__== '__main__':
     dendogram_file = dendogram_file.sort_values(by=['Goal'])
     #dendogram_file = dendogram_file[dendogram_file['Goal'] == 3]
 
-    dendogram_file = dendogram_file.groupby(['Goal', 'Target', 'Indicator', 'Series Code', 'Indicator'])['Indicator'].count()
+    #dendogram_file = dendogram_file.groupby(['Goal', 'Target', 'Indicator', 'Series Code', 'Indicator'])['Indicator'].count()
     #dendogram_file.to_json('x.json', orient='records')
-    print(dendogram_file)
-    #print(tabulate(dendogram_file, headers='keys', tablefmt='psql'))
+    print(tabulate(dendogram_file, headers='keys', tablefmt='psql'))
+    sdgs_hierarchy, T = [], []
+    goals = set(list(dendogram_file['Goal']))
+    goal_dict, target_dict, ind_dict = {}, {}, {}
+    for goal in goals: #goals
+        goal_dict.clear()
+        T.clear()
+        d = dendogram_file[dendogram_file['Goal'] == goal]
+        targets_in_goal_n = list(set(d['Target'])) #target
+        print(goal)
+
+        for target in targets_in_goal_n:
+            indicators = [q for q in set(d['Indicator']) if target == q[:3]] #get all indicators in that target
+            #print(target,': ', indicators)
+            for indicator in indicators: #get all series descriptions for each indicator
+                ind_dict.clear()
+                series_code_per_indicator = d[d['Series Code'].str[-5:] == str(indicator)]
+                f = str(np.array(series_code_per_indicator).tolist()).strip('[[]]').split(',')
+                str_f =[i.strip("' '") for i in f[-3:]]
+                #print('\t', indicator, ': ', str_f)
+                ind_dict[indicator] = str_f
+                t_ind_dict = ind_dict
+                T.append(t_ind_dict)
+            target_dict[target] = t_ind_dict
+            pprint.pprint(target_dict)
+        goal_dict[goal] = target_dict
+
+        #print(T)
+        pprint.pprint(goal_dict)
+        break

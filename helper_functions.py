@@ -84,22 +84,35 @@ def query_for_series_code(org_file, json_file):
     new_data = []
     with open(json_file, 'r') as rb:
         org = pd.read_csv(org_file)
-        org_of_interest = org[['SeriesCode', 'SeriesDescription']]
+        org_of_interest = org[['Goal', 'Target', 'Indicator', 'SeriesCode', 'SeriesDescription']]
         load_file = json.load(rb)
+        q = 0
         for i in load_file:
-            for x,y in zip(org_of_interest['SeriesCode'], org_of_interest['SeriesDescription']):
+            q+=1
+            for a,b,c,x,y in zip(org_of_interest['Goal'], org_of_interest['Target'], org_of_interest['Indicator'], org_of_interest['SeriesCode'], org_of_interest['SeriesDescription']):
                 if str(i['Series_description']).__contains__(str(y)):
                     s = i['Series_description'].split('_')
                     s = sorted(s, key=lambda x: len(x), reverse=True)
+                    w = [a,b,c]
+                    for o in range(len(s)):
+                        for t in [w.pop() for _ in range(len(w))]:
+                            if str(t).strip()[-2:] == '.0':
+                                t = str(int(t))
+                            else:
+                                t = str(t)
+                            s.insert(o+1, t)
+                        break
                     e = '_'.join(i for i in s).rstrip('_')
                     i['Series_description'] = e.replace(str(y), x)
+                    #print(i['Series_description'])
             new_data.append(i)
-
+        print(new_data)
+        print(q)
     with open('encoded_TS_fb.json', 'w') as fb:
         json.dump(new_data, fb, indent=2, sort_keys=True)
     fb.close()
 
-query_for_series_code('egypt.csv', 'sdgs_time_series_fb.json')
+#query_for_series_code('egypt.csv', 'sdgs_time_series_fb.json')
 
 
 def modelling(x, y):

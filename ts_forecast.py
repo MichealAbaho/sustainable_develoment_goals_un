@@ -27,102 +27,111 @@ class ts_forecast:
         n = 4
         t = []
         json_dict = {}
-        with open('sdgs_time_series_arma.json', 'w') as sdgs:
+        with open('sdgs_time_series_fb.json', 'w') as sdgs:
             with open('./PLOTS/combinations.txt', 'a') as comb_file:
                 for sd in self.ts_dict:
                     df = self.ts_dict[sd]
                     if len(df) == 18:
                         v = df[df['Value'] == 0]
-                        if (len(v) < 3):
-                            years_to_predict = range(2014, 2022, 1)
-
+                        #ensure you have atleast 4 values are not null values
+                        if (len(v) <= 13):
+                            years_to_predict = range(2000, 2031, 1)
+                            #change the date column to a date type
                             df['Year'] = df['Year'].astype(str).apply(lambda x: hf.obtain_date(x))
-                            df.set_index('Year', inplace=True)
+                            #df.set_index('Year', inplace=True)
 
-                            # UNDO ONLY WHEN USING FACEBOOKPROPHET
-                            #df.columns = ['ds','y']
+                            #UNDO ONLY WHEN USING FACEBOOKPROPHET
+                            df.columns = ['ds','y2']
+                            y = [np.NaN if i==0 else i for i in df.y2]
+                            df.drop('y2', inplace=True, axis=1)
+                            df['y'] = y
+                            print(tabulate(df, headers='keys', tablefmt='psql'))
 
-                            #sd_p_value = exmine_the_stationarity(df, sd, comb_file, send_p_values=False)
-
-                            # UNDO ONLY WHEN TESTING THE NULL HYPOTHESIS OF THE STATIONARITY
-                            # if sd_p_value > 0.05:
-                            #     find_d(sd, df)
-                            #     validity_of_determined_p_d_q(sd, df)
-
+                #             #sd_p_value = exmine_the_stationarity(df, sd, comb_file, send_p_values=False)
+                #
+                #             # UNDO ONLY WHEN TESTING THE NULL HYPOTHESIS OF THE STATIONARITY
+                #             # if sd_p_value > 0.05:
+                #             #     find_d(sd, df)
+                #             #     validity_of_determined_p_d_q(sd, df)
+                #
                             train, validate = df[:(len(df) - n)], df[(len(df) - n):]
-                            actual = validate.Value.tolist()
+                            actual = validate.y.tolist()
                             #FORECAST
                             try:
-                                #ARIMA
-                                # arima = ARIMA(train, order=(0, 1, 1))
-                                # model_arima = arima.fit(disp=0)
-                                # fc, se, conf = model_arima.forecast(8, alpha=0.05)  # 95% conf
-                                # #Make as pandas series
-                                # fc_series = pd.Series(fc, index=years_to_predict)
-                                # lower_series = pd.Series(conf[:, 0], index=years_to_predict)
-                                # upper_series = pd.Series(conf[:, 1], index=years_to_predict)
-                                # predictions = fc.tolist()[:4]
-                                # json_dict['Series_description'] = sd
-                                # json_dict['Predicted_period'] = list(years_to_predict)
-                                # json_dict['Arima'] = fc.tolist()
-                                # json_dict['RMSE'] = prediction_accuracies(predictions, actual)
-                                #
-                                #
-                                # #UNDO TO VISUALIZE HOW PREDICTIONS ARE TRENDING vs EXPECTATIONS
-                                # # plt.figure(figsize=(12, 5), dpi=100)
-                                # # plt.plot(train, label='training')
-                                # # plt.plot(validate, label='actual')
-                                # # plt.plot(fc_series, label='forecast')
-                                # # plt.fill_between(lower_series.index, lower_series, upper_series,
-                                # #                  color='k', alpha=.15)
-                                # # plt.title('Forecast vs Actuals')
-                                # # plt.legend(loc='upper left', fontsize=8)
-                                # # plt.show()
-                                #
-                                # #BASELINE AUTO-ARIMA
-                                # model_autoarima = auto_arima(train,
-                                #                              trace=True,
-                                #                              test='adf',
-                                #                              max_p=3, max_q=3,
-                                #                              m=1,
-                                #                              d = None,
-                                #                              seasonal=False,
-                                #                              error_action='ignore',
-                                #                              suppress_warnings=True,
-                                #                              stepwise=True)
-                                # a_arima = model_autoarima.fit(train)
-                                # arima_forecast = a_arima.predict(n_periods=len(years_to_predict))  # forecasting the next 4 years
-                                # predictions = arima_forecast.tolist()[:4]
-                                # json_dict['Series_description'] = sd
-                                # json_dict['Predicted_period'] = list(years_to_predict)
-                                # json_dict['Auto_ARIMA'] = arima_forecast.tolist()
-                                # json_dict['RMSE'] = prediction_accuracies(predictions, actual)
-                                #
-                                #
-                                # #FACEBOOK PROHPET
-                                # fb = Prophet(weekly_seasonality=True)
-                                # fb_model = fb.fit(train)
-                                # future = fb_model.make_future_dataframe(periods=len(years_to_predict))
-                                # fb_predict = fb.predict(future)
-                                # predictions = list(fb_predict['yhat'])[-8:][:4]
-                                # actual = validate.y.tolist()
-                                # json_dict['Series_description'] = sd
-                                # json_dict['Predicted_period'] = list(years_to_predict)
-                                # json_dict['FB_prophet'] = list(fb_predict['yhat'])[-8:]
-                                # json_dict['RMSE'] = prediction_accuracies(predictions, actual)
-
-                                #BASELINE ARMA
-                                arma = ARMA(train, order=(0,1))
-                                arma_model = arma.fit(disp=0)
-                                #print('Coefficients: %s' % arma_model.params)
-                                arma_predict = arma_model.predict(start=len(train), end=len(train) + 7, dynamic=False)
-                                predictions = arma_predict.tolist()
+                #                 #ARIMA
+                #                 # arima = ARIMA(train, order=(0, 1, 1))
+                #                 # model_arima = arima.fit(disp=0)
+                #                 # fc, se, conf = model_arima.forecast(8, alpha=0.05)  # 95% conf
+                #                 # #Make as pandas series
+                #                 # fc_series = pd.Series(fc, index=years_to_predict)
+                #                 # lower_series = pd.Series(conf[:, 0], index=years_to_predict)
+                #                 # upper_series = pd.Series(conf[:, 1], index=years_to_predict)
+                #                 # predictions = fc.tolist()[:4]
+                #                 # json_dict['Series_description'] = sd
+                #                 # json_dict['Predicted_period'] = list(years_to_predict)
+                #                 # json_dict['Arima'] = fc.tolist()
+                #                 # json_dict['RMSE'] = prediction_accuracies(predictions, actual)
+                #                 #
+                #                 #
+                #                 # #UNDO TO VISUALIZE HOW PREDICTIONS ARE TRENDING vs EXPECTATIONS
+                #                 # # plt.figure(figsize=(12, 5), dpi=100)
+                #                 # # plt.plot(train, label='training')
+                #                 # # plt.plot(validate, label='actual')
+                #                 # # plt.plot(fc_series, label='forecast')
+                #                 # # plt.fill_between(lower_series.index, lower_series, upper_series,
+                #                 # #                  color='k', alpha=.15)
+                #                 # # plt.title('Forecast vs Actuals')
+                #                 # # plt.legend(loc='upper left', fontsize=8)
+                #                 # # plt.show()
+                #                 #
+                #                 # #BASELINE AUTO-ARIMA
+                #                 # model_autoarima = auto_arima(train,
+                #                 #                              trace=True,
+                #                 #                              test='adf',
+                #                 #                              max_p=3, max_q=3,
+                #                 #                              m=1,
+                #                 #                              d = None,
+                #                 #                              seasonal=False,
+                #                 #                              error_action='ignore',
+                #                 #                              suppress_warnings=True,
+                #                 #                              stepwise=True)
+                #                 # a_arima = model_autoarima.fit(train)
+                #                 # arima_forecast = a_arima.predict(n_periods=len(years_to_predict))  # forecasting the next 4 years
+                #                 # predictions = arima_forecast.tolist()[:4]
+                #                 # json_dict['Series_description'] = sd
+                #                 # json_dict['Predicted_period'] = list(years_to_predict)
+                #                 # json_dict['Auto_ARIMA'] = arima_forecast.tolist()
+                #                 # json_dict['RMSE'] = prediction_accuracies(predictions, actual)
+                #                 #
+                #                 #
+                                #FACEBOOK PROHPET
+                                fb = Prophet(weekly_seasonality=True)
+                                fb_model = fb.fit(train)
+                                future = fb_model.make_future_dataframe(periods=len(years_to_predict))
+                                fb_predict = fb.predict(future)
+                                predictions = list(fb_predict['yhat'])[:18][-4:]
+                                actual = validate.y.tolist()
                                 json_dict['Series_description'] = sd
-                                json_dict['Predicted_period'] = list(years_to_predict)
-                                json_dict['ARMA'] = predictions
+                                json_dict['Predicted_period'] = list(years_to_predict)[-13:]
+                                json_dict['FB_prophet'] = list(fb_predict['yhat'])[-13:]
                                 r_mse, mape = prediction_accuracies(predictions[:4], actual)
                                 json_dict['RMSE'] = r_mse
-                                json_dict['MAPE (%)'] = mape
+                                json_dict['MAPE'] = mape
+                                json_dict['org_values'] = list(df['y'])
+                #
+                #                 #BASELINE ARMA
+                #                 # arma = ARMA(train, order=(0,1))
+                #                 # arma_model = arma.fit(disp=0)
+                #                 # #print('Coefficients: %s' % arma_model.params)
+                #                 # arma_predict = arma_model.predict(start=len(train), end=len(train) + 7, dynamic=False)
+                #                 # predictions = arma_predict.tolist()
+                #                 # json_dict['Series_description'] = sd
+                #                 # json_dict['Predicted_period'] = list(years_to_predict)
+                #                 # json_dict['ARMA'] = predictions
+                #                 # r_mse, mape = prediction_accuracies(predictions[:4], actual)
+                #                 # json_dict['RMSE'] = r_mse
+                #                 # json_dict['MAPE (%)'] = mape
+                #
                                 t.append(json_dict)
                                 json_dict = {}
 
@@ -217,7 +226,7 @@ def validity_of_determined_p_d_q(sd, df):
 
 def prediction_accuracies(prediction, actual):
     difference = np.subtract(prediction, actual)
-    mean_abs_err = np.mean(np.abs(difference))
+    mean_abs_err = np.nanmean(np.abs(difference))
     rmse = np.nanmean(difference**2)**.5
     return rmse, np.mean(difference)
 
@@ -231,9 +240,12 @@ if __name__=='__main__':
         data_reshaped.generate_combinations_per_series_des(unique_sds_in_country)
         # sub_sub_indicators = data_reshaped.sd_time_series_dict
         # for i in sub_sub_indicators:
+        #     print(i)
         #     for j in sub_sub_indicators[i]:
-        #         print(tabulate(j, headers='keys', tablefmt='psql'))
-
+        #         print(j)
+        #     break
+                #print(tabulate(j, headers='keys', tablefmt='psql'))
+        #output a json containing
         f = ts_forecast(data_reshaped.sd_time_series_dict)
         f.tS_forecast()
         # for i in f.ts_dict:

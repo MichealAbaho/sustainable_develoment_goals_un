@@ -32,22 +32,31 @@ class generate_time_series:
         return self.plot_dir
 
     def generate_combinations_per_series_des(self, sd_list):
-        reshaped_data = self.reshaped_df.iloc[1:, :]
+        reshaped_data = self.reshaped_df.iloc[1:, :] #we do this to avoid fumbling with multi-indexed dataframe
+
         reshaped_data.columns = reshaped_data.columns.get_level_values(0)
+
         # rename the columns to suit your desired layout
         columns = np.array(reshaped_data.columns).tolist()
-        years = [range(2000, 2019, 1)]
-        columns = np.concatenate((columns[:-19], years), axis=None)
+
+        years_columns = [i for i,j in enumerate(columns) if j == 'Value'] #obtaining indexes for all years as per reshaped df
+
+        years = [s for s in range(2019, (2019-len(years_columns)), -1)] #obtaining the range of years in your frame given the current or latest year is 2019
+        years = [years.pop() for _ in range(len(years))]
+
+        columns = np.concatenate((columns[:years_columns[0]], years), axis=None)
         reshaped_data.columns = columns
+
         plot_dir = self.create_directories_per_series_des()
+
         #combinations_file = open(os.path.join(plot_dir, 'combinations.txt'), 'a')
         total_list_of_combinations = []
         for sd in sd_list:
             # selecting a series description to perform time series on, selecting the most granular detail #CHECKPOINT 2
             reshaped_data_series = reshaped_data.loc[reshaped_data['SeriesDescription'] == sd]
-            years_df = reshaped_data_series.iloc[:, -19:].fillna(0)
+            years_df = reshaped_data_series.iloc[:, years_columns].fillna(0)
             # You don't want to eliminate any single year irrespective of whether it's completely empty or not
-            parameters = hf.fetch_parameters_for_auto_arima(reshaped_data_series.iloc[:, :-19])
+            parameters = hf.fetch_parameters_for_auto_arima(reshaped_data_series.iloc[:, :-(len(years_columns))])
             filled_params_df = reshaped_data_series[parameters]  # dataframw with attributes that are filled in
 
             filled_params_df = pd.concat([filled_params_df, years_df], axis=1)
@@ -114,12 +123,14 @@ class generate_time_series:
 
 
 if __name__=='__main__':
-    data_processed = dp.data_preprocessing('egypt.csv')
-    data_reshaped = generate_time_series(data_processed.reshaping())
-    if data_reshaped:
-        unique_sds_in_country = data_reshaped.return_list_of_unique_series_des()
-        print('The number of Unique Series_description in Egypt: {}'.format(len(unique_sds_in_country)))
-        data_reshaped.generate_combinations_per_series_des(unique_sds_in_country)
-        # f = data_reshaped.sd_time_series_dict
-        # for j in f:
-        #     print(tabulate(f[j], headers='keys', tablefmt='psql'))
+    data_processed = dp.data_preprocessing('3countries.csv').reshaping()  #this line returns multiple contries
+    print('\n')
+    for country in data_processed:
+        data_reshaped = generate_time_series(data_processed[country])
+        if data_reshaped:
+            unique_sds_in_country = data_reshaped.return_list_of_unique_series_des()
+            print('The number of Unique Series_description in {}: {}'.format(country, len(unique_sds_in_country)))
+            data_reshaped.generate_combinations_per_series_des(unique_sds_in_country)
+        # # f = data_reshaped.sd_time_series_dict
+        # # for j in f:
+        # #     print(tabulate(f[j], headers='keys', tablefmt='psql'))
