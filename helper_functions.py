@@ -8,9 +8,12 @@ import string
 from datetime import datetime
 import pandas as pd
 import pprint
-
+import os
+from glob import glob
 import numpy as np
 import json
+from tabulate import tabulate
+import re
 
 # a generator object to return multiple combinations
 def generate_combinations(x):
@@ -80,40 +83,70 @@ def convert_strings_to_floats(x):
     else:
         return x
 
-def query_for_series_code(org_file, json_file):
-    new_data = []
-    with open(json_file, 'r') as rb:
-        org = pd.read_csv(org_file)
-        org_of_interest = org[['Goal', 'Target', 'Indicator', 'SeriesCode', 'SeriesDescription']]
-        load_file = json.load(rb)
-        q = 0
-        for i in load_file:
-            q+=1
-            for a,b,c,x,y in zip(org_of_interest['Goal'], org_of_interest['Target'], org_of_interest['Indicator'], org_of_interest['SeriesCode'], org_of_interest['SeriesDescription']):
-                if str(i['Series_description']).__contains__(str(y)):
-                    s = i['Series_description'].split('_')
-                    s = sorted(s, key=lambda x: len(x), reverse=True)
-                    w = [a,b,c]
-                    for o in range(len(s)):
-                        for t in [w.pop() for _ in range(len(w))]:
-                            if str(t).strip()[-2:] == '.0':
-                                t = str(int(t))
-                            else:
-                                t = str(t)
-                            s.insert(o+1, t)
-                        break
-                    e = '_'.join(i for i in s).rstrip('_')
-                    i['Series_description'] = e.replace(str(y), x)
-                    #print(i['Series_description'])
-            new_data.append(i)
-        print(new_data)
-        print(q)
-    with open('encoded_TS_fb.json', 'w') as fb:
-        json.dump(new_data, fb, indent=2, sort_keys=True)
-    fb.close()
+#encode the series description names in
+def query_for_series_code(org_file):
 
-#query_for_series_code('egypt.csv', 'sdgs_time_series_fb.json')
+    #look through current director for all sub-directories assuming every sub-directory belongs to a country
+    current_country_dirs = list(dir for dir in os.listdir('../SDGS/') if os.path.isdir(dir))
+    #escape sub-directories the likes of '.git', '__pycache__' and many others
+    current_country_dirs = [i for i in current_country_dirs if not re.search(r'\.|\_', i, re.IGNORECASE)]
+    #open each sub-directory
+    for i, country in enumerate(current_country_dirs):
+        new_data = []
+        #pick only json files, because they're all you want to encode
+        json_fname = glob(os.path.join(os.path.abspath(country), '*.json'))
+        if json_fname:
+            json_file_list = [i for i in json_fname if i.__contains__('series')]
+            json_file = json_file_list[0]
+            json_dir_file = os.path.dirname(json_file)
+            with open(json_file, 'r') as rb:
+                org = pd.read_csv(org_file, low_memory=False)
+                country_org = org[org['GeoAreaName'] == country]
+                org_of_interest = country_org[['Goal', 'Target', 'Indicator', 'SeriesCode', 'SeriesDescription']]
+                load_file = json.load(rb)
+                q = 0
+                for m in load_file:
+                    q+=1
+                    for a,b,c,x,y in zip(org_of_interest['Goal'], org_of_interest['Target'], org_of_interest['Indicator'], org_of_interest['SeriesCode'], org_of_interest['SeriesDescription']):
+                        if str(m['Series_description']).__contains__(str(y)):
+                            s = m['Series_description'].split('_')
+                            s = sorted(s, key=lambda x: len(x), reverse=True)
 
+                            w = [a,b,c]
+                            for d in w:
+                                if d in s:
+                                    s.remove(d)
+
+                            for o in range(len(s)):
+                                for t in [w.pop() for _ in range(len(w))]:
+                                    if str(t).strip()[-2:] == '.0':
+                                        t = str(int(t))
+                                    else:
+                                        t = str(t)
+                                    s.insert(o+1, t)
+                                    #print(s)
+                                break
+
+                            e = '_'.join(i for i in s).rstrip('_')
+                            m['Series_description'] = e.replace(str(y), x)
+                        else:
+                            pass
+
+                    new_data.append(m)
+
+            with open(os.path.join(json_dir_file, 'encoded_TS_fb.json'), 'w') as fb:
+                json.dump(new_data, fb, indent=2, sort_keys=True)
+            fb.close()
+            rb.close()
+
+#query_for_series_code('allcountries.csv')
+
+#creating a directory for the plots
+def create_directories_per_series_des(name=''):
+    _dir = os.path.abspath(os.path.join(os.path.curdir, name))
+    if not os.path.exists(_dir):
+        os.makedirs(_dir)
+    return _dir
 
 def modelling(x, y):
     X_train, x_test, Y_train, y_test = train_test_split(x, y, test_size=0.2)
