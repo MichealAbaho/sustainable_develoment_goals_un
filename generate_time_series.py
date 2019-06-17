@@ -21,15 +21,7 @@ class generate_time_series:
     #returning the unique series description for a country
     def return_list_of_unique_series_des(self):
         sd_list = set([i for i in self.reshaped_df['SeriesDescription']])
-        sd_list = set([i for i in self.reshaped_df['SeriesDescription']])
         return sd_list
-
-    #creating a directory for the plots
-    def create_directories_per_series_des(self):
-        self.plot_dir = os.path.abspath(os.path.join(os.path.curdir, 'PLOTS'))
-        if not os.path.exists(self.plot_dir):
-            os.makedirs(self.plot_dir)
-        return self.plot_dir
 
     def generate_combinations_per_series_des(self, sd_list):
         reshaped_data = self.reshaped_df.iloc[1:, :] #we do this to avoid fumbling with multi-indexed dataframe
@@ -47,8 +39,7 @@ class generate_time_series:
         columns = np.concatenate((columns[:years_columns[0]], years), axis=None)
         reshaped_data.columns = columns
 
-        plot_dir = self.create_directories_per_series_des()
-
+        plot_dir = hf.create_directories_per_series_des(name='PLOTS')
         #combinations_file = open(os.path.join(plot_dir, 'combinations.txt'), 'a')
         total_list_of_combinations = []
         for sd in sd_list:
@@ -89,9 +80,10 @@ class generate_time_series:
             i = 0
             sd_time_series_dict = []
             for comb in combinations:
+
                 time_serie_df = pd.DataFrame()
                 time_serie_df = filled_params_df
-                series_description_name = ''.join(j for j in ['{}_'.format(str(i[1])) for i in comb])
+                series_description_name = ''.join(j for j in ['{}+^'.format(str(i[1])) for i in comb if str(i[0]) != 'SeriesDescription'])
 
                 for pair in comb:
                     col, val = pair
@@ -104,7 +96,7 @@ class generate_time_series:
                     time_serie_df = time_serie_df.astype(float)
                     time_serie_df = time_serie_df.stack().groupby(level=1).sum().reset_index().rename(columns={'index': 'Year', 0: 'Value'})
                     time_serie_df['Year'] = time_serie_df['Year'].apply(lambda x: datetime.strptime(x, '%Y').year)
-                    time_serie_df = time_serie_df[time_serie_df['Year'] != 2018]
+                    #time_serie_df = time_serie_df[time_serie_df['Year'] != 2018]
                     self.sd_time_series_dict[series_description_name] = time_serie_df
                     #sd_time_series_dict.append(time_serie_df)
                     #print(tabulate(time_serie_df, headers='keys', tablefmt='psql'))
@@ -120,17 +112,19 @@ class generate_time_series:
                 except:
                     exc_type, exc_obj, exc_tb = sys.exc_info()
                     print(exc_type, exc_obj, exc_tb.tb_lineno)
-
+        return  self.sd_time_series_dict, combinations
 
 if __name__=='__main__':
     data_processed = dp.data_preprocessing('3countries.csv').reshaping()  #this line returns multiple contries
     print('\n')
     for country in data_processed:
+        print(country)
         data_reshaped = generate_time_series(data_processed[country])
         if data_reshaped:
             unique_sds_in_country = data_reshaped.return_list_of_unique_series_des()
             print('The number of Unique Series_description in {}: {}'.format(country, len(unique_sds_in_country)))
-            data_reshaped.generate_combinations_per_series_des(unique_sds_in_country)
-        # # f = data_reshaped.sd_time_series_dict
-        # # for j in f:
-        # #     print(tabulate(f[j], headers='keys', tablefmt='psql'))
+            d = data_reshaped.generate_combinations_per_series_des(unique_sds_in_country)
+            #f = data_reshaped.sd_time_series_dict
+            for j in d:
+                print(tabulate(d[j], headers='keys', tablefmt='psql'))
+        break
