@@ -70,9 +70,9 @@ def tS_forecast(dict_):
 
     return list_of_country_time_series
 
-@dask.delayed
+# @dask.delayed
 def fb(train, validate, years_to_predict):
-    fb = Prophet(weekly_seasonality=True)
+    fb = Prophet(weekly_seasonality=False, daily_seasonality=False, yearly_seasonality=False,uncertainty_samples=100)
     fb_model = fb.fit(train)
     future = fb_model.make_future_dataframe(periods=len(years_to_predict))
     fb_predict = fb.predict(future)
@@ -174,10 +174,10 @@ if __name__=='__main__':
     start_time = time.time()
     t = []
     print("Started ###########################################################")
-    #data_processed = dp.data_preprocessing('allcountries.csv').reshaping()
-    clean_data = dask.delayed(dp.data_preprocessing)('allcountries.csv')
-    data_processed = dask.delayed(clean_data.reshaping())
-    data_processed = dask.delayed(data_processed).compute()
+    data_processed = dp.data_preprocessing('data.csv').reshaping()
+    #clean_data = dask.delayed(dp.data_preprocessing)('3countries.csv')
+    # data_processed = dask.delayed(clean_data.reshaping())
+    # data_processed = dask.delayed(data_processed).compute()
 
     for country in data_processed:
         country_dir = hf.create_directories_per_series_des(name=country)
