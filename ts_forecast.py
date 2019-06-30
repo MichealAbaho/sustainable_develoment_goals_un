@@ -18,6 +18,9 @@ import warnings
 import sys
 import os
 import warnings
+import multiprocessing as mlp
+from tqdm import *
+import itertools as it
 
 warnings.filterwarnings("ignore", category=Warning)
 #speeding up our timeseries
@@ -25,17 +28,23 @@ from dask.distributed import Client, LocalCluster
 import dask
 import time
 
-def tS_forecast(dict_):
+#set the prediction period before hand
+years_to_predict = range(2000, 2031, 1)
+
+pool = mlp.Pool(mlp.cpu_count())
+
+#append all the time series for each country keeping a copy of both the series to use during the training as well as the one for validation
+def build_series(dict_):
     n = 4
-    list_of_country_time_series = []
-    json_dict = {}
+    training_series = []
+    validation_series = []
+
     for sd in dict_:
         df = dict_[sd]
         if len(df) == 19:
             v = df[df['Value'] == 0]
             #ensure you have atleast 4 values are not null values
             if (len(v) <= 15):
-                years_to_predict = range(2000, 2031, 1)
                 #change the date column to a date type
                 df['Year'] = df['Year'].astype(str).apply(lambda x: hf.obtain_date(x))
                 #df.set_index('Year', inplace=True)
@@ -48,39 +57,62 @@ def tS_forecast(dict_):
 
                 train, validate = df[:(len(df) - n)], df[(len(df) - n):]
                 actual = validate.y.tolist()
-                #FORECAST
-                try:
-                   #FACEBOOK PROHPET
-                    fb_predict, r_mse, mape = fb(train, validate, years_to_predict)
-                    json_dict['Series_description'] = sd
-                    json_dict['Predicted_period'] = list(years_to_predict)[-13:]
-                    json_dict['FB_prophet'] = list(fb_predict['yhat'])[-13:]
-                    json_dict['RMSE'] = r_mse
-                    json_dict['MAPE'] = mape
-                    json_dict['org_values'] = list(df['y'])
+                #append all the time series for each country keeping a copy of both the series to use during the training as well as the one for validation
+                training_series.append((sd, df['y'], train))
+                validation_series.append(actual)
 
+    return training_series, validation_series
+
+def tS_forecast(train, validate):
+    list_of_country_time_series = []
+    # FORECAST
+    try:
+        # FACEBOOK PROHPET
+        train_set = [i[2] for i in train]
+        sds = [i[0] for i in train]
+        years = [i[1] for i in train]
+        predictions = list(tqdm(pool.imap(run_fb, train_set), total=len(train_set)))
+        if (len(sds) == len(predictions) == len(validate)):
+            json_dict = {}
+            for sd,ts,vd,y in zip(sds, predictions, validate, predictions):
+                r_mse, mape = evaluate_facebook_prophet(ts, vd)
+                json_dict['Series_description'] = sd
+                json_dict['Predicted_period'] = list(years_to_predict)[-13:]
+                json_dict['FB_prophet'] = list(ts['yhat'])[-13:]
+                json_dict['RMSE'] = r_mse
+                json_dict['MAPE'] = mape
+                json_dict['org_values'] = list(y)
+
+                if json_dict:
                     list_of_country_time_series.append(json_dict)
-                    json_dict = {}
+                json_dict = {}
+        else:
+            'Raise Eyebrows, Something is Wrong and its because of the below \n ' \
+            'length of training set-{} is not equal to the length of validation set-{} or legnth of the series description list-{}'.format(len(predictions),
+                                                                                                                                           len(validate),                                                                                                                                    len(sds))
 
-                except Exception as e:
-                    exc_type, exc_obj, exc_tb = sys.exc_info()
-                    print(exc_type)
-                    print(exc_obj)
-                    print(exc_tb.tb_lineno)
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        print(exc_type)
+        print(exc_obj)
+        print(exc_tb.tb_lineno)
 
     return list_of_country_time_series
 
-# @dask.delayed
-def fb(train, validate, years_to_predict):
-    fb = Prophet(weekly_seasonality=False, daily_seasonality=False, yearly_seasonality=False,uncertainty_samples=100)
+
+#@dask.delayed
+def run_fb(train):
+    fb = Prophet(yearly_seasonality=False, weekly_seasonality=False, daily_seasonality=True)
     fb_model = fb.fit(train)
     future = fb_model.make_future_dataframe(periods=len(years_to_predict))
     fb_predict = fb.predict(future)
+    return fb_predict
+
+def evaluate_facebook_prophet(fb_predict, validate):
     predictions = list(fb_predict['yhat'])[:18][-4:]
     actual = validate.y.tolist()
     r_mse, mape = prediction_accuracies(predictions[:4], actual)
-    return fb_predict, r_mse, mape
-
+    return r_mse, mape
 
 
 #take a close look at rolling stats
@@ -171,15 +203,17 @@ def prediction_accuracies(prediction, actual):
 if __name__=='__main__':
     cluster = LocalCluster(n_workers=5, scheduler_port=0, diagnostics_port=0, processes=False)
     client = Client(cluster)
-    start_time = time.time()
+    initial_time = time.time()
     t = []
-    print("Started ###########################################################")
-    data_processed = dp.data_preprocessing('data.csv').reshaping()
-    #clean_data = dask.delayed(dp.data_preprocessing)('3countries.csv')
-    # data_processed = dask.delayed(clean_data.reshaping())
-    # data_processed = dask.delayed(data_processed).compute()
+
+    #data_processed = dp.data_preprocessing('allcountries.csv').reshaping()
+    countriesdf = pd.read_csv('3countries.csv')
+    clean_data = dask.delayed(dp.data_preprocessing)('3countries.csv')
+    data_processed = dask.delayed(clean_data.reshaping())
+    data_processed = dask.delayed(data_processed).compute()
 
     for country in data_processed:
+        print(country)
         country_dir = hf.create_directories_per_series_des(name=country)
         with open(os.path.join(country_dir, 'sdgs_time_series_fb.json'), 'w') as sdgs:
             with open(os.path.join(country_dir, 'combinations.txt'), 'w') as comb_file:
@@ -189,8 +223,14 @@ if __name__=='__main__':
                     print('The number of Unique Series_description in {}: {}'.format(country, len(unique_sds_in_country)))
                     country_time_series, combinations = data_reshaped.generate_combinations_per_series_des(unique_sds_in_country)
 
-                    country_time_series_list = tS_forecast(country_time_series)
+                    print("Started ###########################################################")
+                    start_time = time.time()
+                    training_series, validation_series = build_series(country_time_series)
 
+                    country_time_series_list = tS_forecast(training_series, validation_series)
+                    print('Forecasting for {} Completed'.format(country))
+                    end_time = time.time()
+                    print('EXECUTION TIME ############################################################# \n{}'.format((end_time - start_time)))
                     json.dump(country_time_series_list, sdgs, indent=2, sort_keys=True)
 
                     comb_file.write('{}\n'.format(country))
@@ -201,7 +241,6 @@ if __name__=='__main__':
                 comb_file.close()
             sdgs.close()
 
-    print('{} Complete'.format(country))
-    end_time = time.time()
-    print('EXECUTION TIME ############################################################# \n{}'.format((end_time-start_time)))
+    final_time = time.time()
+    print('EXECUTION TIME ############################################################# \n{}'.format((initial_time-final_time)))
 
