@@ -4,11 +4,12 @@ import data_preprocess as dp
 import helper_functions as hf
 import os
 import sys
+import re
 from tabulate import tabulate
 from datetime import datetime
 import matplotlib.pyplot as plt
 import json
-import pprint
+from pprint import pprint
 
 pd.options.display.max_columns=40
 
@@ -23,7 +24,7 @@ class generate_time_series:
         sd_list = set([i for i in self.reshaped_df['SeriesDescription']])
         return sd_list
 
-    def generate_combinations_per_series_des(self, sd_list):
+    def generate_combinations_per_series_des(self, sd_list, ctry):
         reshaped_data = self.reshaped_df.iloc[1:, :] #we do this to avoid fumbling with multi-indexed dataframe
 
         reshaped_data.columns = reshaped_data.columns.get_level_values(0)
@@ -39,8 +40,8 @@ class generate_time_series:
         columns = np.concatenate((columns[:years_columns[0]], years), axis=None)
         reshaped_data.columns = columns
 
-        plot_dir = hf.create_directories_per_series_des(name='PLOTS')
-        #combinations_file = open(os.path.join(plot_dir, 'combinations.txt'), 'a')
+        combinations_folder = hf.create_directories_per_series_des(name='COMBINATIONS')
+        combinations_file = open(os.path.join(combinations_folder, '{} combinations.txt'.format(ctry)), 'w')
         total_list_of_combinations = []
         for sd in sd_list:
             # selecting a series description to perform time series on, selecting the most granular detail #CHECKPOINT 2
@@ -68,19 +69,18 @@ class generate_time_series:
             combinations = hf.generate_combinations(parameter_record_list)
             total_list_of_combinations.append(len(combinations))
 
-            #combinations_file.write('{}\n'.format(sd))
-            # for i in combinations:
-            #     combinations_file.write('{}\n'.format(str(i)))
-            # combinations_file.write('\n')
-            #
-            # combinations_df = pd.DataFrame({i:combinations})
+            combinations_file.write('{}\n'.format(sd))
+            for i in combinations:
+                combinations_file.write('{}\n'.format(str(i)))
+            combinations_file.write('\n')
+
+            combinations_df = pd.DataFrame({i:combinations})
             # print('\nAttributes to be considered in the various time series prediction include \n {}'.format(parameter_record_list))
             # print(tabulate(combinations_df, headers='keys', tablefmt=''))
 
             i = 0
             sd_time_series_dict = []
             for comb in combinations:
-
                 time_serie_df = pd.DataFrame()
                 time_serie_df = filled_params_df
                 series_description_name = ''.join(j for j in ['{}+^'.format(str(i[1])) for i in comb if str(i[0]) != 'SeriesDescription'])
@@ -112,19 +112,57 @@ class generate_time_series:
                 except:
                     exc_type, exc_obj, exc_tb = sys.exc_info()
                     print(exc_type, exc_obj, exc_tb.tb_lineno)
-        return  self.sd_time_series_dict, combinations
+        return  self.sd_time_series_dict, combinations, combinations_folder
 
 if __name__=='__main__':
-    data_processed = dp.data_preprocessing('3countries.csv').reshaping()  #this line returns multiple contries
+    data_processed = dp.data_preprocessing('allcountries.csv').reshaping()  #this line returns multiple contries
     print('\n')
     for country in data_processed:
-        print(country)
-        data_reshaped = generate_time_series(data_processed[country])
-        if data_reshaped:
-            unique_sds_in_country = data_reshaped.return_list_of_unique_series_des()
-            print('The number of Unique Series_description in {}: {}'.format(country, len(unique_sds_in_country)))
-            d = data_reshaped.generate_combinations_per_series_des(unique_sds_in_country)
-            #f = data_reshaped.sd_time_series_dict
-            for j in d:
-                print(tabulate(d[j], headers='keys', tablefmt='psql'))
-        break
+        if country.lower() == 'belgium':
+            country_dir = hf.create_directories_per_series_des('COMBINATIONS/{}'.format(country))
+            data_reshaped = generate_time_series(data_processed[country])
+            if data_reshaped:
+                unique_sds_in_country = data_reshaped.return_list_of_unique_series_des()
+                #print('The number of Unique Series_description in {}: {}'.format(country, len(unique_sds_in_country)))
+                time_seies_dict, combinations, combinations_folder = data_reshaped.generate_combinations_per_series_des(unique_sds_in_country, country)
+                #f = data_reshaped.sd_time_series_dict
+                #print(len(time_seies_dict))
+                sds, sds_list = {}, []
+                goals = list(range(1, 18, 1))
+                for goal in goals:
+                    for i,j in enumerate(time_seies_dict):
+                        r = j.strip().split('+^')
+                        d = [i for i in list(r) if len(i) > 0]
+                        d.sort(key=lambda x:len(x))
+                        try:
+                            f = [re.match(r'^\d{1,2}$', i) for i in d]
+                            f = [i for i in f if i != None]
+                            f = int(f[0].group())
+                            if f in goals and f == goal:
+                                sds_list.append((j, time_seies_dict[j]))
+                            else:
+                                pass
+                        except ValueError as e:
+                            print('Nothing seems to be an integer in there')
+                    sds[goal] = [i for i in sds_list]
+                    sds_list.clear()
+
+                with open(os.path.join(country_dir, 'column_names.txt'), 'w') as cn:
+                    for k,v in sds.items():
+                        analysis_file = pd.DataFrame([i for i in range(2001, 2020, 1)])
+                        cn.write('{} \n'.format(str(k)))
+                        for item in v:
+                            analysis_file = pd.concat([analysis_file, item[1]['Value']], axis=1)
+                            cn.writelines(str(item[0]))
+                            cn.writelines('\n')
+                        cn.writelines('\n')
+
+                        analysis_file_copy = analysis_file.copy()
+                        analysis_file_copy.rename(columns={analysis_file_copy.columns[0]:"Year"}, inplace=True)
+                        analysis_file_copy.set_index('Year', inplace=True)
+                        analysis_file_copy.columns = ['SD_{}'.format(i) for i in range(1, len(v)+1)]
+
+                        analysis_file_copy.to_csv(os.path.join(country_dir, '{}_goal_{}.csv'.format(country, k)))
+                    cn.close()
+
+
