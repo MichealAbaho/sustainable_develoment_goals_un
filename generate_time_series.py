@@ -129,40 +129,44 @@ if __name__=='__main__':
                 #print(len(time_seies_dict))
                 sds, sds_list = {}, []
                 goals = list(range(1, 18, 1))
+                t= open('t.txt', 'w')
                 for goal in goals:
                     for i,j in enumerate(time_seies_dict):
                         r = j.strip().split('+^')
                         d = [i for i in list(r) if len(i) > 0]
                         d.sort(key=lambda x:len(x))
-                        try:
-                            f = [re.match(r'^\d{1,2}$', i) for i in d]
-                            f = [i for i in f if i != None]
-                            f = int(f[0].group())
-                            if f in goals and f == goal:
-                                sds_list.append((j, time_seies_dict[j]))
-                            else:
-                                pass
-                        except ValueError as e:
-                            print('Nothing seems to be an integer in there')
-                    sds[goal] = [i for i in sds_list]
-                    sds_list.clear()
+                        t.writelines(d)
+                #         try:
+                #             f = [re.match(r'^\d{1,2}$', i) for i in d]
+                #             f = [i for i in f if i != None]
+                #             f = int(f[0].group())
+                #             if f in goals and f == goal:
+                #                 sds_list.append((j, time_seies_dict[j]))
+                #             else:
+                #                 pass
+                #         except ValueError as e:
+                #             print('Nothing seems to be an integer in there')
+                #     sds[goal] = [i for i in sds_list]
+                #     sds_list.clear()
+                # for u,v in sds.items():
+                #     print(u)
 
-                with open(os.path.join(country_dir, 'column_names.txt'), 'w') as cn:
-                    for k,v in sds.items():
-                        analysis_file = pd.DataFrame([i for i in range(2001, 2020, 1)])
-                        cn.write('{} \n'.format(str(k)))
-                        for item in v:
-                            analysis_file = pd.concat([analysis_file, item[1]['Value']], axis=1)
-                            cn.writelines(str(item[0]))
-                            cn.writelines('\n')
-                        cn.writelines('\n')
-
-                        analysis_file_copy = analysis_file.copy()
-                        analysis_file_copy.rename(columns={analysis_file_copy.columns[0]:"Year"}, inplace=True)
-                        analysis_file_copy.set_index('Year', inplace=True)
-                        analysis_file_copy.columns = ['SD_{}'.format(i) for i in range(1, len(v)+1)]
-
-                        analysis_file_copy.to_csv(os.path.join(country_dir, '{}_goal_{}.csv'.format(country, k)))
-                    cn.close()
+                # with open(os.path.join(country_dir, 'column_names.txt'), 'w') as cn:
+                #     for k,v in sds.items():
+                #         analysis_file = pd.DataFrame([i for i in range(2001, 2020, 1)])
+                #         cn.write('{} \n'.format(str(k)))
+                #         for item in v:
+                #             analysis_file = pd.concat([analysis_file, item[1]['Value']], axis=1)
+                #             cn.writelines(str(item[0]))
+                #             cn.writelines('\n')
+                #         cn.writelines('\n')
+                #
+                #         analysis_file_copy = analysis_file.copy()
+                #         analysis_file_copy.rename(columns={analysis_file_copy.columns[0]:"Year"}, inplace=True)
+                #         analysis_file_copy.set_index('Year', inplace=True)
+                #         analysis_file_copy.columns = ['SD_{}'.format(i) for i in range(1, len(v)+1)]
+                #
+                #         analysis_file_copy.to_csv(os.path.join(country_dir, '{}_goal_{}.csv'.format(country, k)))
+                #     cn.close()
 
 
